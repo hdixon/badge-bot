@@ -209,13 +209,16 @@ def checkValidMessage(item):
 	subject = item.subject.strip().lower()
 	body = item.body.strip().lower()
 
-	acceptableSubjects = ["update", "request", "remove", "reset"]
+	acceptableCommands = ["update", "request", "remove", "reset"]
 	print("Checking valid message")
 
-	if subject in acceptableSubjects:
-	# okay, subject is within set of acceptable subjects
+	if body in acceptableSubjects or isValidDate(body):
+	# okay, seems to be within set of acceptable commands
+		if not isInDatabase(subject):
+			# this is a new subreddit!
+			return 0
 
-		if subject == "update" and isValidDate(body):
+		if body == "update" and isValidDate(body):
 			print("Update message recieved with valid body: " + body)
 			return True
 		elif subject == 'request' or subject == 'reset':
@@ -229,8 +232,9 @@ def checkValidMessage(item):
 
 	return False
 
-def updateFlair(redditor, flairText):
-	sub = bot.subreddit('StopSpeeding')
+def updateFlair(redditor, flairText, subreddit):
+	subredditString = cleanSubredditString(subreddit)
+	sub = bot.subreddit(subredditString)
 	username = str(redditor)
 	return sub.flair.set(username, flairText, css_class='badge')
 
@@ -239,47 +243,83 @@ def removeFlair(redditor, subreddit):
 	sub = bot.subreddit(subredditString)
 	return sub.flair.delete(redditor)
 
+def acceptModInvites():
+	for message in bot.inbox.unread(limit=None):
+		if message.body.startswith('gadzooks!'):
+			sub = bot.get_info(thing_id=message.subreddit.fullname)
+			try:
+				sub.mod.accept_invite()
+				print("I think I accepted a mod invite to " + str(sub))
+			except:
+				print("Tried to accept invite, but invalid.")
+
+
+def checkMyModPermissions(subreddit):
+	# for the next version
+	# moderators = sub.moderator()
+	# for mod in moderators:
+	# 	if str(mod) == 'badge-bot':
+	# 		# okay i'm a mod now
+	# 		print("okay i'm a mod are the permissions okay")
+	return 0
+
 def iterateMessageRequests():
 	unreadMessages = bot.inbox.unread(limit=None)
-	unread_messages = []
+	# unread_messages = []
+
 	today = datetime.today().strftime("%Y-%m-%d")
+
 	for item in unreadMessages:
+
 		assert(isinstance(item, Message))
-		if(checkValidMessage(item)):
-			print("New message is valid, from " + str(item.author))
-			subreddit = str(item.subject.lower())
-			body = str(item.body.lower())
-			if body == "reset":
-				print("New badge request... giving badge")
-				updateDate(item.author, today, subreddit) # DEFINE SUBREDDIT
-				item.mark_read()
-				item.reply("Request honored. Your badge has been updated.")
-			elif isValidDate(body):
-				if int(daysSince(item.body)) > 1440:
-					# dont allow for manually updating flairs more than 4 years
-					item.reply("You may only update a flair with up to 4 years in the past. Try again with a more recent date or contact moderators manually to update your flair accordingly.")
-				else:
-					updateDate(item.author, item.body)
-					item.reply("Update honored. Your badge has been updated.")
+		subreddit = str(item.subject.lower())
+		body = str(item.body.lower())
 
-				item.mark_read()
+		if not isInDatabase(subreddit):
+			# if subreddit is not in database, check if we're a mod
+			bot.subreddit(subreddit).mod.accept_invite()
 
-			elif body == 'remove':
-				print("Message is remove request.")
-				removeFromDatabase(author, subject)
-				print("Removed from database")
-				removeFlair(item.author, subject)
-				item.mark_read()
-				item.reply("You've been removed from the badge database.")
+			for moderator in bot.subreddit(subreddit).moderator():
+				item.reply("Please invite u/badgebot to moderate with flair permissions.")
+			item.reply('The subreddit in the subject field was not in the database. Please invite u/badgebot to moderate with flair permissions.')
+			item.mark_read()
+
+		elif isInDatabase(subreddit):
+			if(checkValidMessage(item)):
+				print("New message is valid, from " + str(item.author))
+				if body == "reset":
+					print("New badge request... giving badge")
+					updateDate(item.author, today, subreddit) # DEFINE SUBREDDIT
+					item.mark_read()
+					item.reply("Request honored. Your badge has been updated.")
+				elif isValidDate(body):
+					if int(daysSince(item.body)) > 1440:
+						# dont allow for manually updating flairs more than 4 years
+						item.reply("You may only update a flair with up to 4 years in the past. Try again with a more recent date or contact moderators manually to update your flair accordingly.")
+					else:
+						updateDate(item.author, item.body)
+						item.reply("Update honored. Your badge has been updated.")
+
+					item.mark_read()
+
+				elif body == 'remove':
+					print("Message is remove request.")
+					removeFromDatabase(author, subject)
+					print("Removed from database")
+					removeFlair(item.author, subject)
+					item.mark_read()
+					item.reply("You've been removed from the badge database.")
 		else:
 			s = "Hello %s, your message is invalid: \n %s \n %s" % (item.author, item.subject, item.body)
 			print(s)
-			item.reply("Your message is invalid.")
+			item.reply(s)
 			item.mark_read()
 
 
+acceptModInvites()
+
 # updateDatabase('huckingfoes', '2020-01-04', 'russianthing')
-removeFromDatabase('huckingfoes', 'russianthing')
+# removeFromDatabase('huckingfoes', 'russianthing')
 # count = 0
 # while True:
 # 	count += 1
