@@ -15,7 +15,7 @@ def cleanSubredditString(subreddit):
 	subredditString = subreddit.replace('r/', '')
 
 	# DEBUGGING: lets just check if we had to replace anything
-	if(s != subreddit):
+	if(subredditString != subreddit):
 		print("Oh we had to remove a r/ from %s to %s" %(subreddit, subredditString))
 
 	return subredditString
@@ -27,23 +27,23 @@ def create_table(subreddit):
 	subredditString = cleanSubredditString(subreddit)
 	conn = sqlite3.connect(db)
 	c = conn.cursor()
-	c.execute('CREATE TABLE IF NOT EXISTS ? (username TEXT NOT NULL, badgedate TEXT NOT NULL, dateadded TEXT NOT NULL);', (subredditString,))
+	c.execute('CREATE TABLE IF NOT EXISTS ' + subredditString + ' (username TEXT NOT NULL, badgedate TEXT NOT NULL, dateadded TEXT NOT NULL);')
 
-    conn.commit()
-    conn.close()
-    print('Created table: ' + subredditString)
+	conn.commit()
+	conn.close()
+	print('Created table: ' + subredditString)
 
 	return True
 
 
 def table_exists(tableName):
-	assert(isInstance(tableName, str)) # ensure input is a string
+	assert(isinstance(tableName, str)) # ensure input is a string
 	# return boolean if table exists or not
 
 	try:
 		conn = sqlite3.connect(db)
 		c = conn.cursor()
-		c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='?';", (tableName,))
+		c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name=?;", (tableName,))
 
 		if c.fetchone()[0] == 1:
 			# table exists
@@ -78,19 +78,20 @@ def addSubreddit(subreddit):
 
 	return -1
 
-def isInDatabase(username):
+def isInDatabase(username, subreddit):
 	# check if redditor is in database
-	assert(isinstance(username, String))
+	assert(isinstance(username, str))
+	subreddit = cleanSubredditString(subreddit)
 
 	try:
 		conn = sqlite3.connect(db)
 		cur = conn.cursor()
-		cur.execute("SELECT username FROM users WHERE username =" + " '" + username + "'")
+		cur.execute("SELECT * FROM " + subreddit + " WHERE username =" + " '" + username + "'")
 		rows = cur.fetchall()
-		print(rows)
 
 		if len(rows) == 1:
 			# user exists, we can update the date in the db and update flairText
+			print(rows)
 			return True
 
 		elif len(rows) == 0:
@@ -127,20 +128,18 @@ def updateAllBadges():
 
 	return 1
 
-def removeFromDatabase(username):
+def removeFromDatabase(username, subreddit):
 	username = str(username)
-	if not isInDatabase(username):
+	subreddit = cleanSubredditString(subreddit)
+	if not isInDatabase(username, subreddit):
 		print("Tried to remove user not in database.")
 		return 0
 
 	try:
-		username = str(username)
 		print("Trying to remove, user is in db: " + str(username))
 		conn = sqlite3.connect(db)
 		c = conn.cursor()
-		sqlite_param = """DELETE FROM users
-						WHERE username = ?
-						"""
+		sqlite_param = "DELETE FROM " + subreddit + " WHERE username = ?"
 
 		c.execute(sqlite_param, (username,))
 		conn.commit()
@@ -155,43 +154,44 @@ def removeFromDatabase(username):
 
 	return 1
 
-def updateDate(username, startDate):
+def updateDate(username, startDate, subreddit):
 	dateDiff = daysSince(startDate)
 	username = str(username)
 
 	if isInDatabase(username):
-		updateDatabase(username, startDate)
+		updateDatabase(username, startDate, subreddit)
 		updateFlair(username, str(dateDiff + " days"))
 	else:
-		insertInDatabase(username, startDate)
+		insertInDatabase(username, startDate, subreddit)
 		updateFlair(username, str(dateDiff + " days"))
 
-def updateDatabase(username, startDate):
+def updateDatabase(username, startDate, subreddit):
 	try:
+		subredditString = cleanSubredditString(subreddit)
 		conn = sqlite3.connect(db)
 		c = conn.cursor()
-		sqlite_insert_with_param = """UPDATE users
-								SET badgedate = ?
-								WHERE username = ?
-								"""
 		data_tuple = (startDate, username)
-		c.execute(sqlite_insert_with_param, data_tuple)
+		c.execute('UPDATE ' + subreddit + ' SET badgedate = ? WHERE username = ?', (startDate, username))
 		conn.commit()
 		conn.close()
 	except Exception as e:
 		print(e)
 		raise
 
-def insertInDatabase(username, startDate):
+def insertInDatabase(username, startDate, subreddit):
+	subreddit = cleanSubredditString(subreddit)
+	assert(not isInDatabase(username, subreddit))
 	if isinstance(startDate, datetime):
 		startDate = datetime.strptime(startDate, "%Y-%m-%d")
 	try:
 		conn = sqlite3.connect(db)
 		c = conn.cursor()
-		sqlite_insert_with_param = """INSERT INTO users
-                          (username, badgedate)
-                          VALUES (?, ?);"""
-		data_tuple = (username, startDate)
+		todayString = datetime.today().strftime("%Y-%m-%d")
+		query1 = 'INSERT INTO ' + subreddit + ' '
+		query2 = '(username, badgedate, dateadded) VALUES (?, ?, ?);'
+		sqlite_insert_with_param = query1 + query2
+		data_tuple = (username, startDate, todayString)
+
 		c.execute(sqlite_insert_with_param, data_tuple)
 		conn.commit()
 		conn.close()
@@ -234,8 +234,9 @@ def updateFlair(redditor, flairText):
 	username = str(redditor)
 	return sub.flair.set(username, flairText, css_class='badge')
 
-def removeFlair(redditor):
-	sub = bot.subreddit('StopSpeeding')
+def removeFlair(redditor, subreddit):
+	subredditString = cleanSubredditString(subreddit)
+	sub = bot.subreddit(subredditString)
 	return sub.flair.delete(redditor)
 
 def iterateMessageRequests():
@@ -243,44 +244,42 @@ def iterateMessageRequests():
 	unread_messages = []
 	today = datetime.today().strftime("%Y-%m-%d")
 	for item in unreadMessages:
-		if isinstance(item, Message):
-			if(checkValidMessage(item)):
-				print("New message is valid, from " + str(item.author))
-				subj = str(item.subject.lower())
-				if subj == 'request' or subj == "reset":
-					print("New badge request... giving badge")
-					updateDate(item.author, today)
-					item.mark_read()
-					item.reply("Request honored. Your badge has been updated.")
-				elif subj == 'update':
-					if isValidDate(item.body):
-						if int(daysSince(item.body)) > 1440:
-							# dont allow for manually updating flairs more than 4 years
-							item.reply("You may only update a flair with up to 4 years in the past. Try again with a more recent date or contact moderators manually to update your flair accordingly.")
-						else:
-							updateDate(item.author, item.body)
-							item.reply("Update honored. Your badge has been updated.")
-						item.mark_read()
-					else:
-						item.mark_read()
-						item.reply("I could not parse the date you provided.")
-				elif subj == 'remove':
-					print("Message is remove request.")
-					removeFromDatabase(item.author)
-					print("Removed from database")
-					removeFlair(item.author)
-					item.mark_read()
-					item.reply("You've been removed from the badge database.")
-			else:
-				s = "Hello %s, your message is invalid: \n %s \n %s" % (item.author, item.subject, item.body)
-				print(s)
-				item.reply("Your message is invalid.")
+		assert(isinstance(item, Message))
+		if(checkValidMessage(item)):
+			print("New message is valid, from " + str(item.author))
+			subreddit = str(item.subject.lower())
+			body = str(item.body.lower())
+			if body == "reset":
+				print("New badge request... giving badge")
+				updateDate(item.author, today, subreddit) # DEFINE SUBREDDIT
+				item.mark_read()
+				item.reply("Request honored. Your badge has been updated.")
+			elif isValidDate(body):
+				if int(daysSince(item.body)) > 1440:
+					# dont allow for manually updating flairs more than 4 years
+					item.reply("You may only update a flair with up to 4 years in the past. Try again with a more recent date or contact moderators manually to update your flair accordingly.")
+				else:
+					updateDate(item.author, item.body)
+					item.reply("Update honored. Your badge has been updated.")
+
 				item.mark_read()
 
+			elif body == 'remove':
+				print("Message is remove request.")
+				removeFromDatabase(author, subject)
+				print("Removed from database")
+				removeFlair(item.author, subject)
+				item.mark_read()
+				item.reply("You've been removed from the badge database.")
+		else:
+			s = "Hello %s, your message is invalid: \n %s \n %s" % (item.author, item.subject, item.body)
+			print(s)
+			item.reply("Your message is invalid.")
+			item.mark_read()
 
-addSubreddit('guardiansofchastity')
-addSubreddit('russianthing')
 
+# updateDatabase('huckingfoes', '2020-01-04', 'russianthing')
+removeFromDatabase('huckingfoes', 'russianthing')
 # count = 0
 # while True:
 # 	count += 1
