@@ -111,18 +111,34 @@ def isInDatabase(username, subreddit):
 
 	return -1
 
-def updateAllBadges():
+def loopThroughTables():
+	try:
+		conn = sqlite3.connect(db)
+		db_list = []
+
+		mycursor = conn.cursor()
+		for db_name in mycursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'"):
+			db_list.append(db_name)
+		for x in db_list:
+			print(x[0])
+			updateAllBadges(x[0])
+
+		conn.close()
+	except sqlite3.Error as e:
+		print('Db Not found', str(e))
+
+def updateAllBadges(subreddit):
 	try:
 		conn = sqlite3.connect(db)
 		c = conn.cursor()
-		c.execute('SELECT * from users')
+		c.execute('SELECT * from ' + subreddit)
 
 		for row in c:
 			username = row[0]
 			badgedate = row[1]
 			dateDiff = daysSince(badgedate)
 			newBadge = str(dateDiff + " days")
-			updateFlair(username, newBadge)
+			updateFlair(username, newBadge, subreddit)
 			print("updateAllBadges: updated " + username + " with " + newBadge)
 
 	except Exception as e:
@@ -358,14 +374,17 @@ def isValidDate(date):
 
 count = 0
 while True:
-	count += 1
 	t = datetime.today().strftime('%H:%M:%S')
-	print(t + " Main loop, checking messages.")
+	if count % 10 == 0:
+		print(t + " Main loop, checking messages.")
+
 	iterateMessageRequests()
 
 	if count % 500 == 0:
 		print("Count is " + str(count))
 		print("Updating all badges.")
-		updateAllBadges()
+		loopThroughTables()
+
+	count += 1
 
 	time.sleep(30)
