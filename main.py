@@ -12,30 +12,54 @@ db = "badges.db"
 
 
 def tableExists(tableName):
+	# untested
 	query = "SELECT name FROM ? WHERE type='table' AND name='?';"
 	try:
 		conn = sqlite3.connect(db)
 		cur = conn.cursor()
 		sql_tuple = (db, tableName)
 		cur.execute = (query, sql_tuple)
+		if len(cur) == 1:
+			conn.close()
+			return True
+		elif len(cur) > 1:
+			# there's an issue, there's more than 1 table with that name
+			print("Issue: more than one table with the same name wtf")
+			conn.close()
+			return -1
+		else:
+			# table doesn't exist
+			conn.close()
+			return 0
 	except Exception as e:
 		print(e)
 
 
 def addSubreddit(subName):
+	# unfinished
 	assert(isinstance(subName, String))
 
 	if(tableExists):
-		return 1
+		# don't do anything and return false
+		return 0
 
 	else:
-		# create table
-		return 0
+		query = ''' CREATE TABLE IF NOT EXISTS ? (
+					username text NOT NULL,
+					badgedate text NOT NULL,
+					);
+				'''
+		sql_tuple = (subName,)
+
+		# create table and return true
+		return 1
 
 	return -1
 
 def isInDatabase(username):
 	# check if redditor is in database
+	assert(isinstance(username, String))
+
 	try:
 		conn = sqlite3.connect(db)
 		cur = conn.cursor()
@@ -61,7 +85,6 @@ def isInDatabase(username):
 		print(e)
 
 	return -1
-
 
 def updateAllBadges():
 	try:
