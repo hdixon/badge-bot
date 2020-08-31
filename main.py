@@ -10,29 +10,47 @@ bot = praw.Reddit("badge-bot", user_agent="badge-bot by u/huckingfoes")
 db = "badges.db"
 
 
+def create_table(subreddit):
+	# connects to a db and creates new table for subreddit
+	subreddit = str(subreddit) # just make sure subreddit is a string
+	subreddit = subreddit.replace('/r/', '')
+	subreddit = subreddit.replace('r/', '')
+
+	conn = sqlite3.connect(db)
+	c = conn.cursor()
+	c.execute(
+		'CREATE TABLE IF NOT EXISTS ? (username TEXT NOT NULL, badgedate TEXT NOT NULL, dateadded TEXT NOT NULL);',
+		(
+			subreddit,
+		)
+
+	)
+
+    conn.commit()
+    conn.close()
+    print('Create table: ' + subreddit)
+
 
 def tableExists(tableName):
-	# untested
-	query = "SELECT name FROM ? WHERE type='table' AND name='?';"
+	assert(isInstance(tableName, str)) # ensure input is a string
+	# return boolean if table exists or not
+
 	try:
 		conn = sqlite3.connect(db)
-		cur = conn.cursor()
-		sql_tuple = (db, tableName)
-		cur.execute = (query, sql_tuple)
-		if len(cur) == 1:
-			conn.close()
+		c = conn.cursor()
+		c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='?';", tableName)
+		if c.fetchone()[0] == 1:
+			print("Table exists: " + tableName)
 			return True
-		elif len(cur) > 1:
-			# there's an issue, there's more than 1 table with that name
-			print("Issue: more than one table with the same name wtf")
-			conn.close()
-			return -1
 		else:
 			# table doesn't exist
-			conn.close()
-			return 0
+			print("Table does not exist: " + tableName)
+			return False
+		conn.commit()
+		conn.close()
 	except Exception as e:
 		print(e)
+		raise
 
 
 def addSubreddit(subName):
@@ -50,6 +68,7 @@ def addSubreddit(subName):
 					);
 				'''
 		sql_tuple = (subName,)
+		conn = sql_connect(db) # change this
 
 		# create table and return true
 		return 1
@@ -90,8 +109,7 @@ def updateAllBadges():
 	try:
 		conn = sqlite3.connect(db)
 		c = conn.cursor()
-		sqlite_param = 'SELECT * from users'
-		c.execute(sqlite_param)
+		c.execute('SELECT * from users')
 
 		for row in c:
 			username = row[0]
