@@ -4,36 +4,35 @@ from datetime import datetime
 from praw.models import Message
 from dateutil.parser import parse
 import time
+from datesfunc import *
 
-
-bot = praw.Reddit("stopspeedingbot", user_agent="StopSpeeding badge bot by u/huckingfoes")
+bot = praw.Reddit("badge-bot", user_agent="badge-bot by u/huckingfoes")
 db = "badges.db"
 
 
-def daysSince(date):
-	assert isValidDate(date)
-	startDateObject = parse(date)
-	todayObject = datetime.today()
-	assert(todayObject >= startDateObject)
-	# d = datetime.strptime(date, "%Y-%m-%d")
-	# today = datetime.strptime(today, "%Y-%m-%d")
-	daysSince = abs(todayObject - startDateObject)
-	return str(daysSince.days)
 
-def isValidDate(date):
-	if date:
-		try:
-			date = parse(date)
-			if date <= datetime.today():
-				return True
-			elif parse(date == datetime.today()):
-				return True
-			else:
-				return False
-		except Exception as e:
-			print(e)
-			return False
-	return False
+def tableExists(tableName):
+	query = "SELECT name FROM ? WHERE type='table' AND name='?';"
+	try:
+		conn = sqlite3.connect(db)
+		cur = conn.cursor()
+		sql_tuple = (db, tableName)
+		cur.execute = (query, sql_tuple)
+	except Exception as e:
+		print(e)
+
+
+def addSubreddit(subName):
+	assert(isinstance(subName, String))
+
+	if(tableExists):
+		return 1
+
+	else:
+		# create table
+		return 0
+
+	return -1
 
 def isInDatabase(username):
 	# check if redditor is in database
