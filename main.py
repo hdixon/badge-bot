@@ -299,8 +299,8 @@ def iterateMessageRequests():
 
 		elif table_exists(subreddit):
 
-			# if(checkValidMessage(item)):
-			if True:
+			if(checkValidMessage(item)):
+			# if True:
 				print("New message is valid, from " + str(item.author))
 				if body == "reset":
 					print("New badge request... giving badge")
