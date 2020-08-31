@@ -9,37 +9,44 @@ from datesfunc import *
 bot = praw.Reddit("badge-bot", user_agent="badge-bot by u/huckingfoes")
 db = "badges.db"
 
+def cleanSubredditString(subreddit):
+	subreddit = str(subreddit) # just make sure subreddit is a string
+	subredditString = subreddit.replace('/r/', '')
+	subredditString = subreddit.replace('r/', '')
+
+	# DEBUGGING: lets just check if we had to replace anything
+	if(s != subreddit):
+		print("Oh we had to remove a r/ from %s to %s" %(subreddit, subredditString))
+
+	return subredditString
+
 
 def create_table(subreddit):
 	# connects to a db and creates new table for subreddit
-	subreddit = str(subreddit) # just make sure subreddit is a string
-	subreddit = subreddit.replace('/r/', '')
-	subreddit = subreddit.replace('r/', '')
 
+	subredditString = cleanSubredditString(subreddit)
 	conn = sqlite3.connect(db)
 	c = conn.cursor()
-	c.execute(
-		'CREATE TABLE IF NOT EXISTS ? (username TEXT NOT NULL, badgedate TEXT NOT NULL, dateadded TEXT NOT NULL);',
-		(
-			subreddit,
-		)
-
-	)
+	c.execute('CREATE TABLE IF NOT EXISTS ? (username TEXT NOT NULL, badgedate TEXT NOT NULL, dateadded TEXT NOT NULL);', (subredditString,))
 
     conn.commit()
     conn.close()
-    print('Create table: ' + subreddit)
+    print('Created table: ' + subredditString)
+
+	return True
 
 
-def tableExists(tableName):
+def table_exists(tableName):
 	assert(isInstance(tableName, str)) # ensure input is a string
 	# return boolean if table exists or not
 
 	try:
 		conn = sqlite3.connect(db)
 		c = conn.cursor()
-		c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='?';", tableName)
+		c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='?';", (tableName,))
+
 		if c.fetchone()[0] == 1:
+			# table exists
 			print("Table exists: " + tableName)
 			return True
 		else:
@@ -53,24 +60,20 @@ def tableExists(tableName):
 		raise
 
 
-def addSubreddit(subName):
-	# unfinished
-	assert(isinstance(subName, String))
+def addSubreddit(subreddit):
+	# takes subreddit string
+	subredditString = cleanSubredditString(subreddit)
+	# assert(isinstance(subredditString, str))
 
-	if(tableExists):
+	if(table_exists(subredditString)):
 		# don't do anything and return false
+		# technically we don't need this check because we only create unique
+		#     tables due to the SQL IF NOT EXISTS
 		return 0
 
 	else:
-		query = ''' CREATE TABLE IF NOT EXISTS ? (
-					username text NOT NULL,
-					badgedate text NOT NULL,
-					);
-				'''
-		sql_tuple = (subName,)
-		conn = sql_connect(db) # change this
-
-		# create table and return true
+		# if table doesn't exist, we make it
+		create_table(subredditString)
 		return 1
 
 	return -1
@@ -143,6 +146,8 @@ def removeFromDatabase(username):
 		conn.commit()
 		conn.close()
 		print("Removed " + username + " from database.")
+
+		return 1
 
 	except Exception as e:
 		print(e)
@@ -272,16 +277,20 @@ def iterateMessageRequests():
 				item.reply("Your message is invalid.")
 				item.mark_read()
 
-count = 0
-while True:
-	count += 1
-	t = datetime.today().strftime('%H:%M:%S')
-	print(t + " Main loop, checking messages.")
-	iterateMessageRequests()
 
-	if count % 120 == 0:
-		print("Count is " + str(count))
-		print("Updating all badges.")
-		updateAllBadges()
+addSubreddit('guardiansofchastity')
+addSubreddit('russianthing')
 
-	time.sleep(180)
+# count = 0
+# while True:
+# 	count += 1
+# 	t = datetime.today().strftime('%H:%M:%S')
+# 	print(t + " Main loop, checking messages.")
+# 	iterateMessageRequests()
+#
+# 	if count % 120 == 0:
+# 		print("Count is " + str(count))
+# 		print("Updating all badges.")
+# 		updateAllBadges()
+#
+# 	time.sleep(180)
