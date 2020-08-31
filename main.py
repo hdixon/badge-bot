@@ -18,7 +18,7 @@ def cleanSubredditString(subreddit):
 	if(subredditString != subreddit):
 		print("Oh we had to remove a r/ from %s to %s" %(subreddit, subredditString))
 
-	return subredditString
+	return subredditString.lower()
 
 
 def create_table(subreddit):
@@ -69,11 +69,13 @@ def addSubreddit(subreddit):
 		# don't do anything and return false
 		# technically we don't need this check because we only create unique
 		#     tables due to the SQL IF NOT EXISTS
+		print("Table already exists.")
 		return 0
 
 	else:
 		# if table doesn't exist, we make it
 		create_table(subredditString)
+		print("Table doesn't exist... creating.")
 		return 1
 
 	return -1
@@ -209,19 +211,18 @@ def checkValidMessage(item):
 	subject = item.subject.strip().lower()
 	body = item.body.strip().lower()
 
-	acceptableCommands = ["update", "request", "remove", "reset"]
+	acceptableCommands = ["update", "remove", "reset"]
 	print("Checking valid message")
 
 	if body in acceptableSubjects or isValidDate(body):
 	# okay, seems to be within set of acceptable commands
 		if not isInDatabase(subject):
-			# this is a new subreddit!
-			return 0
+			return False
 
-		if body == "update" and isValidDate(body):
+		if isValidDate(body):
 			print("Update message recieved with valid body: " + body)
 			return True
-		elif subject == 'request' or subject == 'reset':
+		elif subject == 'reset':
 			return True
 		elif subject == 'remove':
 			return True
@@ -246,50 +247,61 @@ def removeFlair(redditor, subreddit):
 def acceptModInvites():
 	for message in bot.inbox.unread(limit=None):
 		if message.body.startswith('gadzooks!'):
-			sub = bot.get_info(thing_id=message.subreddit.fullname)
+
+			subredditInstance = message.subreddit
+			subredditString = cleanSubredditString(message.subreddit)
+			print("Found invite to " + subredditString)
+			message.mark_read()
 			try:
-				sub.mod.accept_invite()
-				print("I think I accepted a mod invite to " + str(sub))
+				subredditInstance.mod.accept_invite()
+				print("Accepted mod invite!")
+				message.reply("Thanks for the invite. I can now provide badges for your subreddit as long as I have flair permissions. Check my userpage for more info.")
+				# print("Checking all moderators.")
+				# checkModPerms(subredditInstance)
+				print("Creating new table for subreddit...")
+				addSubreddit(subredditString)
 			except:
 				print("Tried to accept invite, but invalid.")
 
-
-def checkMyModPermissions(subreddit):
+def checkModPerms(sub):
 	# for the next version
-	# moderators = sub.moderator()
-	# for mod in moderators:
-	# 	if str(mod) == 'badge-bot':
-	# 		# okay i'm a mod now
-	# 		print("okay i'm a mod are the permissions okay")
+	moderators = sub.moderator()
+	for mod in moderators:
+		print(mod)
+		if str(mod) == 'badge-bot':
+			# okay i'm a mod now
+			print("okay i'm a mod are the permissions okay")
 	return 0
+
+
 
 def iterateMessageRequests():
 	unreadMessages = bot.inbox.unread(limit=None)
 	# unread_messages = []
+
+	# get any mod invites out of the way
+	acceptModInvites()
 
 	today = datetime.today().strftime("%Y-%m-%d")
 
 	for item in unreadMessages:
 
 		assert(isinstance(item, Message))
-		subreddit = str(item.subject.lower())
+		subreddit = cleanSubredditString(item.subject)
 		body = str(item.body.lower())
 
-		if not isInDatabase(subreddit):
+		if not table_exists(subreddit):
 			# if subreddit is not in database, check if we're a mod
-			bot.subreddit(subreddit).mod.accept_invite()
-
-			for moderator in bot.subreddit(subreddit).moderator():
-				item.reply("Please invite u/badgebot to moderate with flair permissions.")
-			item.reply('The subreddit in the subject field was not in the database. Please invite u/badgebot to moderate with flair permissions.')
+			item.reply("Your subreddit is not in our database. Message your moderators or please invite u/badgebot to moderate with flair permissions.")
 			item.mark_read()
 
-		elif isInDatabase(subreddit):
+		elif table_exists(subreddit):
+
 			if(checkValidMessage(item)):
 				print("New message is valid, from " + str(item.author))
 				if body == "reset":
 					print("New badge request... giving badge")
-					updateDate(item.author, today, subreddit) # DEFINE SUBREDDIT
+					updateDate(item.author, today, subreddit)
 					item.mark_read()
 					item.reply("Request honored. Your badge has been updated.")
 				elif isValidDate(body):
@@ -316,20 +328,17 @@ def iterateMessageRequests():
 			item.mark_read()
 
 
-acceptModInvites()
 
-# updateDatabase('huckingfoes', '2020-01-04', 'russianthing')
-# removeFromDatabase('huckingfoes', 'russianthing')
-# count = 0
-# while True:
-# 	count += 1
-# 	t = datetime.today().strftime('%H:%M:%S')
-# 	print(t + " Main loop, checking messages.")
-# 	iterateMessageRequests()
-#
-# 	if count % 120 == 0:
-# 		print("Count is " + str(count))
-# 		print("Updating all badges.")
-# 		updateAllBadges()
-#
-# 	time.sleep(180)
+count = 0
+while True:
+	count += 1
+	t = datetime.today().strftime('%H:%M:%S')
+	print(t + " Main loop, checking messages.")
+	iterateMessageRequests()
+
+	if count % 500 == 0:
+		print("Count is " + str(count))
+		print("Updating all badges.")
+		updateAllBadges()
+
+	time.sleep(30)
