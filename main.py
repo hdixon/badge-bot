@@ -160,12 +160,12 @@ def updateDate(username, startDate, subreddit):
 	dateDiff = daysSince(startDate)
 	username = str(username)
 
-	if isInDatabase(username):
+	if isInDatabase(username, subreddit):
 		updateDatabase(username, startDate, subreddit)
-		updateFlair(username, str(dateDiff + " days"))
+		updateFlair(username, str(dateDiff + " days"), subreddit)
 	else:
 		insertInDatabase(username, startDate, subreddit)
-		updateFlair(username, str(dateDiff + " days"))
+		updateFlair(username, str(dateDiff + " days"), subreddit)
 
 def updateDatabase(username, startDate, subreddit):
 	try:
@@ -208,24 +208,24 @@ def checkValidMessage(item):
 	# ensure type of item is Message
 	assert(isinstance(item, Message))
 	redditor = item.author
-	subject = item.subject.strip().lower()
-	body = item.body.strip().lower()
+	subject = cleanSubredditString(item.subject)
+	body = str(item.body).strip().lower()
 
 	acceptableCommands = ["remove", "reset"]
 	print("Checking valid message")
 
 	if body in acceptableCommands or isValidDate(body):
 	# okay, seems to be within set of acceptable commands
-		if not isInDatabase(subject):
+		if not table_exists(subject):
 			print("Message invalid (1)")
 			return False
 
 		if isValidDate(body):
 			print("Update message recieved with valid body: " + body)
 			return True
-		elif subject == 'reset':
+		elif body == 'reset':
 			return True
-		elif subject == 'remove':
+		elif body == 'remove':
 			return True
 		else:
 			print("checkValidMessage failed (other)")
@@ -291,6 +291,7 @@ def iterateMessageRequests():
 		assert(isinstance(item, Message))
 		subreddit = cleanSubredditString(item.subject)
 		body = str(item.body.lower())
+		author = item.author
 
 		if not table_exists(subreddit):
 			# if subreddit is not in database, check if we're a mod
@@ -312,18 +313,18 @@ def iterateMessageRequests():
 						# dont allow for manually updating flairs more than 4 years
 						item.reply("You may only update a flair with up to 4 years in the past. Try again with a more recent date or contact moderators manually to update your flair accordingly.")
 					else:
-						updateDate(item.author, item.body)
+						updateDate(author, body, subreddit)
 						item.reply("Update honored. Your badge has been updated.")
 
 					item.mark_read()
 
 				elif body == 'remove':
 					print("Message is remove request.")
-					removeFromDatabase(author, subject)
+					removeFromDatabase(author, subreddit)
 					print("Removed from database")
-					removeFlair(item.author, subject)
+					removeFlair(author, subreddit)
 					item.mark_read()
-					item.reply("You've been removed from the badge database.")
+					item.reply("You've been removed from the badge database: " + subreddit)
 		else:
 			s = "Hello %s, your message is invalid: \n %s \n %s" % (item.author, item.subject, item.body)
 			print(s)
