@@ -211,12 +211,13 @@ def checkValidMessage(item):
 	subject = item.subject.strip().lower()
 	body = item.body.strip().lower()
 
-	acceptableCommands = ["update", "remove", "reset"]
+	acceptableCommands = ["remove", "reset"]
 	print("Checking valid message")
 
-	if body in acceptableSubjects or isValidDate(body):
+	if body in acceptableCommands or isValidDate(body):
 	# okay, seems to be within set of acceptable commands
 		if not isInDatabase(subject):
+			print("Message invalid (1)")
 			return False
 
 		if isValidDate(body):
@@ -285,6 +286,7 @@ def iterateMessageRequests():
 	today = datetime.today().strftime("%Y-%m-%d")
 
 	for item in unreadMessages:
+		print(unreadMessages)
 
 		assert(isinstance(item, Message))
 		subreddit = cleanSubredditString(item.subject)
@@ -297,7 +299,8 @@ def iterateMessageRequests():
 
 		elif table_exists(subreddit):
 
-			if(checkValidMessage(item)):
+			# if(checkValidMessage(item)):
+			if True:
 				print("New message is valid, from " + str(item.author))
 				if body == "reset":
 					print("New badge request... giving badge")
@@ -327,6 +330,29 @@ def iterateMessageRequests():
 			item.reply(s)
 			item.mark_read()
 
+
+def daysSince(date):
+	assert isValidDate(date)
+	startDateObject = parse(date)
+	todayObject = datetime.today()
+	assert(todayObject >= startDateObject)
+	daysSince = abs(todayObject - startDateObject)
+	return str(daysSince.days)
+
+def isValidDate(date):
+	if date:
+		try:
+			date = parse(date)
+			if date <= datetime.today():
+				return True
+			elif parse(date == datetime.today()):
+				return True
+			else:
+				return False
+		except Exception as e:
+			print(e)
+			return False
+	return False
 
 
 count = 0
