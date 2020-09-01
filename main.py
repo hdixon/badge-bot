@@ -324,12 +324,13 @@ def iterateMessageRequests():
 	today = datetime.today().strftime("%Y-%m-%d")
 
 	for item in unreadMessages:
-		print(unreadMessages)
+		# print(item)
 
 		assert(isinstance(item, Message))
 		subreddit = cleanSubredditString(item.subject)
 		body = str(item.body.lower())
 		author = item.author
+		print("New message from %s\n subject: %s \n body: %s " %(author, subreddit, body))
 
 		if not table_exists(subreddit):
 			# if subreddit is not in database, check if we're a mod
@@ -349,20 +350,23 @@ def iterateMessageRequests():
 				elif isValidDate(body):
 					if int(daysSince(item.body)) > 2880:
 						# dont allow for manually updating flairs more than 4 years
+						print("Replying to invalid date request")
 						item.reply("You may only update a flair with up to 8 years in the past. Try again with a more recent date or contact moderators manually to update your flair accordingly.")
 					else:
 						updateDate(author, body, subreddit)
 						item.reply("Update honored. Your badge has been updated.")
+						print("Updated badge.")
 
 					item.mark_read()
 
 				elif body == 'remove':
 					print("Message is remove request.")
 					removeFromDatabase(author, subreddit)
-					print("Removed " + str(author) " from " + subreddit)
+					print("Removed " + str(author) + " from " + subreddit)
 					removeFlair(author, subreddit)
 					item.mark_read()
 					item.reply("You've been removed from the badge database: " + subreddit)
+					print("Replied to remove request.")
 		else:
 			s = "Hello %s, your message is invalid: \n %s \n %s" % (item.author, item.subject, item.body)
 			print(s)
@@ -381,14 +385,20 @@ def daysSince(date):
 def isValidDate(date):
 	if date:
 		try:
+			print(str(date))
 			date = parse(date)
+			print(date)
 			if date <= datetime.today():
 				return True
-			elif parse(date == datetime.today()):
+				print("Date  is before or equal today")
+			elif date == datetime.today():
 				return True
+				print("Date is today")
 			else:
+				print("Invalid date: " + str(date))
 				return False
 		except Exception as e:
+			print("Exception")
 			print(e)
 			return False
 	return False
@@ -396,16 +406,19 @@ def isValidDate(date):
 
 count = 0
 
+
+
 while True:
 	t = datetime.today().strftime('%H:%M:%S')
-	if count % 10 == 0:
-		print(t + " Main loop, checking messages.")
+	if count % 5 == 0:
+		print(t + " Checking messages.")
 
 	iterateMessageRequests()
 
 	count += 1
 
 	if count % 350 == 0:
+		#update all badges every 12 hours or so
 		print("Count is " + str(count))
 		print("Updating all badges.")
 		loopThroughTables()
