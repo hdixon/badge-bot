@@ -367,11 +367,18 @@ def iterateMessageRequests():
 					item.mark_read()
 					item.reply("You've been removed from the badge database: " + subreddit)
 					print("Replied to remove request.")
+			else:
+				s = "Hello %s, your message is invalid: \n %s \n %s" % (item.author, item.subject, item.body)
+				print(s)
+				item.reply(s)
+				item.mark_read()
+
 		else:
 			s = "Hello %s, your message is invalid: \n %s \n %s" % (item.author, item.subject, item.body)
 			print(s)
 			item.reply(s)
 			item.mark_read()
+
 
 
 def daysSince(date):
@@ -390,15 +397,14 @@ def isValidDate(date):
 			print(date)
 			if date <= datetime.today():
 				return True
-				print("Date  is before or equal today")
+				# print("Date  is before or equal today")
 			elif date == datetime.today():
 				return True
-				print("Date is today")
+				# print("Date is today")
 			else:
 				print("Invalid date: " + str(date))
 				return False
 		except Exception as e:
-			print("Exception")
 			print(e)
 			return False
 	return False
