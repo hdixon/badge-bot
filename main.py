@@ -250,14 +250,17 @@ def checkValidMessage(item):
 	if body in acceptableCommands or isValidDate(body):
 	# okay, seems to be within set of acceptable commands
 		if not table_exists(subject):
-			print("Message invalid: table does not exist for " + subject)
+			print("\tMessage invalid: table does not exist for " + subject)
 			return False
 
 		if isValidDate(body):
+			print("\tDate message okay!")
 			return True
 		elif body == 'reset':
+			print("\tReset message okay!")
 			return True
 		elif body == 'remove':
+			print("\tRemove message okay!")
 			return True
 		else:
 			print("checkValidMessage failed (other)")
@@ -283,20 +286,23 @@ def acceptModInvites():
 
 			subredditInstance = message.subreddit
 			subredditString = cleanSubredditString(message.subreddit)
-			print("Found invite to: " + subredditString)
+			print("\tFound invite to: " + subredditString)
 			message.mark_read()
 			try:
 				subredditInstance.mod.accept_invite()
-				print("Accepted mod invite!")
+				print("\t\tAccepted mod invite!")
 				strReply = '''
 							Thanks for the invite! I can now provide badges to your subreddit %s
 							so long as I have flair permissions at least.
-							[Check my userpage for more info on configuring badge bot on your subreddit.]
+							[Check my userpage here](https://www.reddit.com/user/badge-bot/comments/ik7v4y/badgebot_alpha_version_now_available/)
+							for more info on configuring badge-bot on your subreddit.
+							For any issues, please contact u/huckingfoes.
 							'''
-				message.reply("Thanks for the invite. I can now provide badges for your subreddit as long as I have flair permissions. Check my userpage for more info.")
+				message.reply(strReply % (subredditString))
+				print("\tReplied: " + strReply % (subredditString))
 				# print("Checking all moderators.")
 				# checkModPerms(subredditInstance)
-				print("Creating new table for subreddit: " + subredditString)
+				print("\tCreating new table for subreddit: " + subredditString)
 				addSubreddit(subredditString)
 				print("Subreddit added to db.")
 			except:
@@ -371,6 +377,7 @@ def iterateMessageRequests():
 				s = "Hello %s, your message is invalid: \n %s \n %s" % (item.author, item.subject, item.body)
 				print(s)
 				item.reply(s)
+				print("Sent reply: " + s)
 				item.mark_read()
 
 		else:
@@ -392,9 +399,7 @@ def daysSince(date):
 def isValidDate(date):
 	if date:
 		try:
-			print(str(date))
 			date = parse(date)
-			print(date)
 			if date <= datetime.today():
 				return True
 				# print("Date  is before or equal today")
@@ -415,13 +420,12 @@ count = 0
 
 
 while True:
+	count += 1
 	t = datetime.today().strftime('%H:%M:%S')
-	if count % 5 == 0:
+	if count % 5 == 1:
 		print(t + " Checking messages.")
 
 	iterateMessageRequests()
-
-	count += 1
 
 	if count % 350 == 0:
 		#update all badges every 12 hours or so
